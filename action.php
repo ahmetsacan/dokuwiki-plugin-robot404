@@ -16,24 +16,27 @@ class action_plugin_robot404 extends DokuWiki_Action_Plugin {
     }
    }
    function handle_header(&$e){
-       if ($this->ishidden() === false) return;
-       if ($e->name == 'TPL_METAHEADER_OUTPUT'){
-        $found=false;
-        foreach($e->data['meta']?:[] as &$entry){
-          if($entry['name']=='robots'){
-            $content=explode(',',$entry['content']); #e.g., convert 'index,follow' to an array.
-            $content=array_diff($content,['index','follow']); #remove 'index' and 'follow' from the array.
-            $content[]='noindex'; #add noindex and nofollow
-            $content[]='nofollow';
-            $content[]='addedbyrobot404'; #used for debugging.
-            $entry['content']=implode(',',$content);
-            $found=true;
-          }
-        }unset($entry);
-        if(!$found) $e->data['meta']=['name'=>'robots','content'=>'noindex,follow'];
+    global $ACT;
+    #looking at $ACT is not enough (e.g, if 'register' action is disabled, ACT becomes 'show'. We also check the original 'do' parameter.)
+    if(!$this->ishiddenpage()&&!$this->isdisabledaction($ACT)&&!$this->isdisabledaction($_REQUEST['do'])) return;
+    if ($e->name == 'TPL_METAHEADER_OUTPUT'){
+    $found=false;
+    foreach($e->data['meta']?:[] as $key=>$entry){
+      if($entry['name']=='robots'){
+        $content=explode(',',$entry['content']); #e.g., convert 'index,follow' to an array.
+        $content=array_diff($content,['index','follow']); #remove 'index' and 'follow' from the array.
+        $content[]='noindex'; #add noindex and nofollow
+        $content[]='nofollow';
+        #$content[]='addedbyrobot404'; #used for debugging.
+        $entry['content']=implode(',',$content);
+        $e->data['meta'][$key]=$entry;
+        $found=true;
       }
-      elseif ($e->name == 'ACTION_HEADERS_SEND')
-           $e->data[] = 'X-Robots-Tag: noindex,nofollow';
+    }
+    if(!$found) $e->data['meta'][]=['name'=>'robots','content'=>'noindex,nofollow'];
+    }
+    elseif ($e->name == 'ACTION_HEADERS_SEND')
+        $e->data[] = 'X-Robots-Tag: noindex,nofollow';
    }
 
   static function client_isrobot(){
@@ -45,25 +48,33 @@ class action_plugin_robot404 extends DokuWiki_Action_Plugin {
     return false;
   }
 
-   function ishidden(){
+   function ishiddenpage(){
     global $ID;
     return $this->getConf('hiddenpages') && isHiddenPage($ID);
    }
+   function isdisabledaction($action){
+    if(is_array($action)){
+      foreach($action as $act){
+        if($this->isdisabledaction($act)) return true;
+      }
+      return false;
+    }
+    global $conf;
+    $actions=$conf['disableactions'];
+    if(is_string($actions)) $actions=explode(',',$actions);
+    if(in_array($action,$actions)) return true;
+
+    $actions=$this->getConf('disableactions');
+    if(is_string($actions)) $actions=explode(',',$actions);
+    if(in_array($action,$actions)) return true;
+
+    return false;
+   }
    
   function handle_action(&$e){
-    global $conf;
-    $ishidden=$this->ishidden();
-    if(!$ishidden){
-      $actions=$conf['disableactions'];
-      $actions2=$this->getConf('disableactions');
-      #ve([$actions,$actions2]);
-      if(is_string($actions)) $actions=explode(',',$actions);
-      if(is_string($actions2)) $actions2=explode(',',$actions2);
-      $actions=array_merge($actions,$actions2);
-      if(!in_array($e->data,$actions)) return; #if !hidden and !disabledaction, nothing to do. return. 
-    }
+    if(!$this->ishiddenpage() && !$this->isdisabledaction($e->data)) return; #if !hidden and !disabledaction, nothing to do. return.
     header('HTTP/1.0 404 Not Found');
-    echo $ishidden?"Hidden page for robots.":"Disallowed action for robots: ".esc($e->data);
+    echo $this->ishiddenpage()?"Hidden page for robots.":"Disallowed action for robots: ".esc($e->data);
     die();
   }
 }

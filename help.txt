@@ -1,0 +1,4 @@
+^  Summary | Sends 404 code for disallowed actions and hidden pages |
+
+You can configure which actions and whether the hidden pages should result in 404 for robots.
+

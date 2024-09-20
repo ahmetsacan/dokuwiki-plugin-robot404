@@ -1,0 +1,6 @@
+base   robot404
+author Ahmet Sacan
+date   2024-09-20
+name   robot404 plugin
+desc   Sends 404 code to webcrawlers on disallowed actions and hidden pages.
+url    https://github.com/ahmetsacan/dokuwiki-plugin-robot404
